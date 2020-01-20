@@ -1,7 +1,7 @@
 #include <tfhe/tfhe.h>
 #include <tfhe/tfhe_io.h>
 #include <stdio.h>
-#define COUNT 9
+#define COUNT 19
 #define BLEN 16
 struct ciphertext{
   	LweSample* ciphertext1;
@@ -58,16 +58,18 @@ ciphertext[i].ciphertext2=new_gate_bootstrapping_ciphertext_array(BLEN,params);
   {
     for(int n=0;n<BLEN;n++){
       bootsSymEncrypt(&ciphertext[j].ciphertext1[n],(ep[j].exp>>n)&1,key);
-	}
-    for(int n=0;n<BLEN;n++){
+	
+    
       bootsSymEncrypt(&ciphertext[j].ciphertext2[n],(ep[j].val>>n)&1,key);
       //bootsCOPY(&ciphertext[j].ciphertext2[n],(ep[j].val>>n)&1,key);
      }
 
   }
 
+
+
     //taking input from the user
-    int input;
+    int32_t input;
     printf("\nEnter exponent value:");
     scanf("%d", &input);
     
@@ -96,10 +98,9 @@ ciphertext[i].ciphertext2=new_gate_bootstrapping_ciphertext_array(BLEN,params);
      for(int j=0;j<COUNT;j++){
      for(int n=0;n<BLEN;n++){
       export_gate_bootstrapping_ciphertext_toFile(cloud_data, &ciphertext[j].ciphertext1[n],params);
-      }
-    /* for(int n=0;n<64;n++){
+     
       export_gate_bootstrapping_ciphertext_toFile(cloud_data, &ciphertext[j].ciphertext2[n],params);
-      } */
+      } 
   }
       fclose(cloud_data);
 //export the input to cloud
