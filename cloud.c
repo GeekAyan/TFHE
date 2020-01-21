@@ -120,6 +120,9 @@ int main() {
     
     LweSample* result = new_gate_bootstrapping_ciphertext_array(BLEN, params);
     LweSample* result1 = new_gate_bootstrapping_ciphertext_array(BLEN, params);
+    LweSample* remainder = new_gate_bootstrapping_ciphertext_array(BLEN, params);
+    LweSample* mux_op = new_gate_bootstrapping_ciphertext_array(BLEN, params);
+    LweSample* mux_tmp = new_gate_bootstrapping_ciphertext_array(BLEN, params);
     LweSample* ans= new_gate_bootstrapping_ciphertext_array(1,params);
     LweSample* complement = new_gate_bootstrapping_ciphertext_array(1,params); 
     LweSample* enc_th= new_gate_bootstrapping_ciphertext_array(BLEN,params);
@@ -130,15 +133,47 @@ int main() {
 	     {
        		bootsCONSTANT(&enc_th[i],0,bk);
 		bootsCONSTANT(&res_tmp[i],0,bk);
+		bootsCONSTANT(&mux_tmp[i],0,bk);
     	     }
 	
         time_t start_time = clock();
-//equality check//
+//Giant steps: compare the 10th digit//
+FILE* secret_key = fopen("secret.key","rb");
+    TFheGateBootstrappingSecretKeySet* key = new_tfheGateBootstrappingSecretKeySet_fromFile(secret_key);
+    fclose(secret_key);
+	for(int i=9;i<COUNT;i++){
+	subtract(result, ciphertext_input, ciphertext[i].ciphertext1, BLEN,bk);
+	multiplexer(mux_op,ciphertext[i].ciphertext1,mux_tmp,tmps,BLEN,bk);
 	
-	for(int i=0;i<COUNT;i++){
+	//store the result in mux tmp
+	for(int j=0;j<BLEN;j++){ 
+	bootsCOPY(&mux_tmp[j],&mux_op[j],bk);
+	}
+	}
+
+//subtract to get single digit//
+subtract(remainder, ciphertext_input, mux_op, BLEN,bk);
+//decrypt and rebuild the answer
+
+  	  int32_t int_answer=0;
+	int32_t int_answer1=0;
+
+        for(int i=0; i<BLEN; i++){
+            int ai = bootsSymDecrypt(&mux_op[i], key)>0;
+            int_answer |= (ai<<i);
+	    int aj = bootsSymDecrypt(&remainder[i], key)>0;
+            int_answer1 |= (aj<<i);
+        }
+	
+        printf("\n The 10th index : %d and digit : %d \n", int_answer,int_answer1);
+	//decrypt//
+	
+//Baby steps: equality check//
+	
+	for(int i=0;i<10;i++){
 	printf(".");
-        subtract(result, ciphertext[i].ciphertext1, ciphertext_input,BLEN,bk);
-	subtract1(result1,ciphertext_input,ciphertext[i].ciphertext1,BLEN,bk); 
+        subtract(result, ciphertext[i].ciphertext1, remainder,BLEN,bk);
+	subtract1(result1,remainder,ciphertext[i].ciphertext1,BLEN,bk); 
         bootsOR(ans,tmps,tmps1,bk);
         bootsNOT(complement,ans,bk);
 	//Select only the valid result//
