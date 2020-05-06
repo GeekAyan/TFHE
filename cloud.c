@@ -5,12 +5,11 @@
 #include"bitadder.h"
 #define COUNT 19
 #define BLEN 16
-LweSample* tmps;
-LweSample* tmps1;
 
-void subtract(LweSample* result, const LweSample* a, const LweSample* b, const int nb_bits, const TFheGateBootstrappingCloudKeySet* bk) {
+
+void subtract(LweSample* result, LweSample* tmps, const LweSample* a, const LweSample* b, const int nb_bits, const TFheGateBootstrappingCloudKeySet* bk) {
     
-    bootsCONSTANT(&tmps[0], 0, bk); //initialize the carry to 0
+    
 
     //run the elementary comparator gate n times//
       
@@ -19,20 +18,7 @@ void subtract(LweSample* result, const LweSample* a, const LweSample* b, const i
         }
 }
 
-void subtract1(LweSample* result1, const LweSample* a, const LweSample* b, const int nb_bits, const TFheGateBootstrappingCloudKeySet* bk) {
 
-    bootsCONSTANT(&tmps1[0], 0, bk); //initialize the carry to 0
-
-    //run the elementary comparator gate n times//
-        
-    for (int i=0; i<nb_bits; i++) {
-        compare_bit(&result1[i], &a[i], &b[i], &tmps1[0], &tmps1[1], bk);
-        }
- 
-    //delete_gate_bootstrapping_ciphertext_array(2, tmps1);     
-    
-   
-  }
 void Addition(LweSample* top1, const LweSample* a6, const LweSample* b6, LweSample* lsb_carry1, LweSample* tmp6, const 	TFheGateBootstrappingCloudKeySet* bk) {
      LweSample* temp1=new_gate_bootstrapping_ciphertext_array(1, bk->params);
     LweSample* temp2=new_gate_bootstrapping_ciphertext_array(1, bk->params);
@@ -89,8 +75,7 @@ int main() {
 
     printf("Reading the ciphertexts...\n");
    
-     tmps = new_gate_bootstrapping_ciphertext_array(2, params);
-     tmps1 = new_gate_bootstrapping_ciphertext_array(2, params);
+     
 	// initialize cloud ciphertext//
 	for(int i=0;i<COUNT;i++)
 	{
@@ -128,6 +113,8 @@ int main() {
     LweSample* enc_th= new_gate_bootstrapping_ciphertext_array(BLEN,params);
     LweSample* f_result= new_gate_bootstrapping_ciphertext_array(BLEN,params);
     LweSample* res_tmp= new_gate_bootstrapping_ciphertext_array(BLEN,params);
+    LweSample* signbit = new_gate_bootstrapping_ciphertext_array(2, params);;
+    LweSample* signbit1= new_gate_bootstrapping_ciphertext_array(2, params);;
 // initialize the result flags // 
 	 for(int i=0;i<BLEN;i++)
 	     {
@@ -138,12 +125,11 @@ int main() {
 	
         time_t start_time = clock();
 //Giant steps: compare the 10th digit//
-FILE* secret_key = fopen("secret.key","rb");
-    TFheGateBootstrappingSecretKeySet* key = new_tfheGateBootstrappingSecretKeySet_fromFile(secret_key);
-    fclose(secret_key);
+
 	for(int i=9;i<COUNT;i++){
-	subtract(result, ciphertext_input, ciphertext[i].ciphertext1, BLEN,bk);
-	multiplexer(mux_op,ciphertext[i].ciphertext1,mux_tmp,tmps,BLEN,bk);
+	bootsCONSTANT(&signbit[0], 0, bk); //initialize the carry to 0
+	subtract(result, signbit, ciphertext_input, ciphertext[i].ciphertext1, BLEN,bk);
+	multiplexer(mux_op,ciphertext[i].ciphertext1,mux_tmp,signbit,BLEN,bk);
 	
 	//store the result in mux tmp
 	for(int j=0;j<BLEN;j++){ 
@@ -152,10 +138,13 @@ FILE* secret_key = fopen("secret.key","rb");
 	}
 
 //subtract to get single digit//
-subtract(remainder, ciphertext_input, mux_op, BLEN,bk);
+bootsCONSTANT(&signbit[0], 0, bk); //initialize the carry to 0
+subtract(remainder,signbit, ciphertext_input, mux_op, BLEN,bk);
 //decrypt and rebuild the answer
-
-  	  int32_t int_answer=0;
+	FILE* secret_key = fopen("secret.key","rb");
+    	TFheGateBootstrappingSecretKeySet* key = new_tfheGateBootstrappingSecretKeySet_fromFile(secret_key);
+    	fclose(secret_key);
+  	int32_t int_answer=0;
 	int32_t int_answer1=0;
 
         for(int i=0; i<BLEN; i++){
@@ -172,9 +161,11 @@ subtract(remainder, ciphertext_input, mux_op, BLEN,bk);
 	
 	for(int i=0;i<10;i++){
 	printf(".");
-        subtract(result, ciphertext[i].ciphertext1, remainder,BLEN,bk);
-	subtract1(result1,remainder,ciphertext[i].ciphertext1,BLEN,bk); 
-        bootsOR(ans,tmps,tmps1,bk);
+	bootsCONSTANT(&signbit[0], 0, bk); //initialize the carry to 0
+	bootsCONSTANT(&signbit1[0], 0, bk); //initialize the carry to 0
+        subtract(result,signbit, ciphertext[i].ciphertext1, remainder,BLEN,bk);
+	subtract(result1,signbit1,remainder,ciphertext[i].ciphertext1,BLEN,bk); 
+        bootsOR(ans,signbit,signbit1,bk);
         bootsNOT(complement,ans,bk);
 	//Select only the valid result//
         multiplexer(result_val,enc_th,ciphertext[i].ciphertext2,complement,BLEN,bk);
@@ -208,8 +199,8 @@ subtract(remainder, ciphertext_input, mux_op, BLEN,bk);
      	delete_gate_bootstrapping_ciphertext_array(BLEN,ciphertext[i].ciphertext2);
 	}
   	delete_gate_bootstrapping_ciphertext_array(BLEN,ciphertext_input);
-   	delete_gate_bootstrapping_ciphertext_array(2, tmps);
-    	delete_gate_bootstrapping_ciphertext_array(2, tmps1);
+   	delete_gate_bootstrapping_ciphertext_array(2, signbit);
+    	delete_gate_bootstrapping_ciphertext_array(2, signbit1);
     	delete_gate_bootstrapping_ciphertext_array(BLEN, result);
    	delete_gate_bootstrapping_ciphertext_array(BLEN, result1);
 	delete_gate_bootstrapping_ciphertext_array(BLEN, f_result);
@@ -221,10 +212,3 @@ subtract(remainder, ciphertext_input, mux_op, BLEN,bk);
 return 0;
 
 }
-
-   
-
-
-
-
-
